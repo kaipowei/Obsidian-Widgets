@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sine test</title>
+<style>
+  body { font-family: sans-serif; margin: 8px; background: #fff; color: #222; }
+  canvas { width: 100%; height: 220px; border: 1px solid #ccc; border-radius: 6px; display: block; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .row label { width: 90px; font-size: 14px; }
+  .row input { flex: 1; }
+  .row span { width: 50px; text-align: right; font-size: 14px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="600" height="220"></canvas>
+
+<div class="row"><label>A (振幅)</label><input id="A" type="range" min="0.2" max="2" step="0.1" value="1"><span id="Av"></span></div>
+<div class="row"><label>w (頻率)</label><input id="w" type="range" min="0.5" max="5" step="0.1" value="1"><span id="wv"></span></div>
+<div class="row"><label>phi (相位)</label><input id="p" type="range" min="0" max="6.28" step="0.1" value="0"><span id="pv"></span></div>
+
+<script>
+var cv = document.getElementById("c");
+var ctx = cv.getContext("2d");
+var A = document.getElementById("A");
+var w = document.getElementById("w");
+var p = document.getElementById("p");
+
+function draw() {
+  var W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // axes
+  ctx.strokeStyle = "#999";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2);
+  ctx.moveTo(0, 0); ctx.lineTo(0, H);
+  ctx.stroke();
+
+  // curve: y = A sin(w t + phi), t from 0 to 2*pi
+  var a = parseFloat(A.value);
+  var f = parseFloat(w.value);
+  var ph = parseFloat(p.value);
+  ctx.strokeStyle = "#1a73e8";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (var x = 0; x <= W; x++) {
+    var t = (x / W) * 2 * Math.PI;
+    var y = a * Math.sin(f * t + ph);
+    var py = H / 2 - y * (H / 2 - 15) / 2;
+    if (x === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
+  }
+  ctx.stroke();
+
+  document.getElementById("Av").textContent = a.toFixed(1);
+  document.getElementById("wv").textContent = f.toFixed(1);
+  document.getElementById("pv").textContent = ph.toFixed(1);
+}
+
+A.addEventListener("input", draw);
+w.addEventListener("input", draw);
+p.addEventListener("input", draw);
+draw();
+</script>
+</body>
+</html>
