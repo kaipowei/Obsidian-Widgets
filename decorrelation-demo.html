@@ -5,33 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Decorrelation 互動圖</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 12px;
-    background: #ffffff; color: #222222;
-    font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
-    font-size: 14px; line-height: 1.5;
-  }
-  .panels { display: flex; flex-wrap: wrap; gap: 12px; }
-  .panel { flex: 1 1 240px; min-width: 0; }
-  .panel h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
-  canvas { width: 100%; height: auto; display: block; border: 1px solid #d0d0d0; border-radius: 6px; background: #fafafa; }
-  .controls { margin-top: 12px; }
-  .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-  .row label { flex: 0 0 150px; font-size: 13px; }
-  .row input[type=range] { flex: 1 1 auto; min-width: 0; }
-  .row .val { flex: 0 0 44px; text-align: right; font-family: monospace; font-size: 13px; }
-  button {
-    padding: 6px 14px; font-size: 14px; border: 1px solid #4a6fd0; background: #4a6fd0;
-    color: #fff; border-radius: 6px; cursor: pointer; margin-top: 6px;
-  }
-  button:active { background: #3858b0; }
-  .info { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; }
-  .mat { display: inline-block; vertical-align: middle; }
-  .mat table { border-left: 2px solid #444; border-right: 2px solid #444; border-radius: 4px; padding: 0 4px; }
-  .mat td { padding: 1px 8px; text-align: right; font-family: monospace; }
-  .note { margin-top: 10px; font-size: 13px; color: #444; }
-  .legend span { display: inline-block; margin-right: 12px; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 8px;
+  background: #ffffff; color: #222222;
+  font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+  font-size: 14px; line-height: 1.4;
+}
+.panels { display: flex; flex-wrap: wrap; gap: 12px; }
+.panel { flex: 1 1 240px; min-width: 0; }
+.panel h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+canvas { width: 100%; height: auto; display: block; border: 1px solid #d0d0d0; border-radius: 6px; background: #fafafa; }
+.controls { margin-top: 8px; }
+.row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.row label { flex: 0 0 150px; font-size: 13px; }
+.row input[type=range] { flex: 1 1 auto; min-width: 0; }
+.row .val { flex: 0 0 44px; text-align: right; font-family: monospace; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -52,24 +41,6 @@
   <div class="row"><label for="s2">X2 的 variance</label><input type="range" id="s2" min="0.2" max="10" step="0.1" value="1.5"><span class="val" id="s2v"></span></div>
   <div class="row"><label for="rho">相關係數 rho</label><input type="range" id="rho" min="-0.95" max="0.95" step="0.05" value="0.6"><span class="val" id="rhov"></span></div>
   <div class="row"><label for="t">旋轉進度 t</label><input type="range" id="t" min="0" max="1" step="0.01" value="1"><span class="val" id="tv"></span></div>
-  <button id="play">播放轉換 (X 轉成 Y)</button>
-</div>
-
-<div class="info">
-  <div>左圖 X 的 covariance<br><span class="mat" id="matX"></span></div>
-  <div>右圖目前的 covariance<br><span class="mat" id="matY"></span></div>
-  <div>Eigenvalues<br><span id="eig" style="font-family:monospace"></span></div>
-</div>
-
-<div class="note legend">
-  <span>藍點:資料</span>
-  <span>實線橢圓:1 個標準差</span>
-  <span>虛線橢圓:2 個標準差</span>
-  <span style="color:#c0392b">紅箭頭:Σ 的 eigenvector</span>
-</div>
-<div class="note">
-  公式:Σ = O<sup>T</sup> Λ O,Y = OX,cov(Y) = O Σ O<sup>T</sup> = Λ<br>
-  O 只做旋轉,所以橢圓的形狀不變。t 從 0 到 1,右圖的 covariance 非對角線會變成 0,橢圓就轉正了。
 </div>
 
 <script>
@@ -98,13 +69,7 @@
   var gL = cL.getContext("2d"), gR = cR.getContext("2d");
   var W = cL.width, H = cL.height;
 
-  function f(v) {
-    var s = v.toFixed(2);
-    if (s === "-0.00") s = "0.00";
-    return s;
-  }
-
-  var S = {};  // 目前的數值
+  var S = {}; // 目前的數值
 
   function compute() {
     S.s1 = parseFloat(el("s1").value);
@@ -196,10 +161,6 @@
     }
   }
 
-  function matHTML(a, b, c, d) {
-    return "<table><tr><td>" + f(a) + "</td><td>" + f(b) + "</td></tr><tr><td>" + f(c) + "</td><td>" + f(d) + "</td></tr></table>";
-  }
-
   function render() {
     compute();
     el("s1v").textContent = S.s1.toFixed(1);
@@ -209,37 +170,11 @@
     el("tTitle").textContent = S.t.toFixed(2);
 
     drawScene(gL, 0, ["x1", "x2"], true);
-    var alpha = -S.t * S.theta;
-    drawScene(gR, alpha, ["y1", "y2"], false);
-
-    // 右圖目前的 covariance = R Sigma R^T
-    var ca = Math.cos(alpha), sa = Math.sin(alpha);
-    var m11 = ca * S.s1 - sa * S.c, m12 = ca * S.c - sa * S.s2;
-    var m21 = sa * S.s1 + ca * S.c, m22 = sa * S.c + ca * S.s2;
-    var c11 = m11 * ca - m12 * sa, c12 = m11 * sa + m12 * ca;
-    var c21 = m21 * ca - m22 * sa, c22 = m21 * sa + m22 * ca;
-
-    el("matX").innerHTML = matHTML(S.s1, S.c, S.c, S.s2);
-    el("matY").innerHTML = matHTML(c11, c12, c21, c22);
-    el("eig").innerHTML = "λ1 = " + f(S.lam1) + "<br>λ2 = " + f(S.lam2);
+    drawScene(gR, -S.t * S.theta, ["y1", "y2"], false);
   }
 
   ["s1", "s2", "rho", "t"].forEach(function (id) {
     el(id).addEventListener("input", render);
-  });
-
-  var raf = null;
-  el("play").addEventListener("click", function () {
-    if (raf) cancelAnimationFrame(raf);
-    var start = null, dur = 1800;
-    el("t").value = 0; render();
-    function step(ts) {
-      if (start === null) start = ts;
-      var p = Math.min((ts - start) / dur, 1);
-      el("t").value = p; render();
-      if (p < 1) raf = requestAnimationFrame(step); else raf = null;
-    }
-    raf = requestAnimationFrame(step);
   });
 
   render();
