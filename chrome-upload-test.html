@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>damped oscillation test</title>
+<style>
+  body { font-family: sans-serif; margin: 8px; background: #fff; color: #222; }
+  canvas { width: 100%; height: 220px; border: 1px solid #ccc; border-radius: 6px; display: block; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .row label { width: 110px; font-size: 14px; }
+  .row input { flex: 1; }
+  .row span { width: 50px; text-align: right; font-size: 14px; }
+  .note { margin-top: 10px; font-size: 13px; color: #555; }
+</style>
+</head>
+<body>
+<canvas id="c" width="600" height="220"></canvas>
+
+<div class="row"><label>zeta (阻尼比)</label><input id="z" type="range" min="0" max="0.95" step="0.01" value="0.15"><span id="zv"></span></div>
+<div class="row"><label>w0 (自然頻率)</label><input id="w" type="range" min="1" max="10" step="0.1" value="4"><span id="wv"></span></div>
+<div class="note">y(t) = exp(-zeta * w0 * t) * cos(w0 * sqrt(1 - zeta^2) * t)，虛線是衰減包絡線</div>
+
+<script>
+var cv = document.getElementById("c");
+var ctx = cv.getContext("2d");
+var Z = document.getElementById("z");
+var Wn = document.getElementById("w");
+var T_MAX = 10;
+
+function draw() {
+  var W = cv.width, H = cv.height;
+  var z = parseFloat(Z.value);
+  var w0 = parseFloat(Wn.value);
+  var wd = w0 * Math.sqrt(1 - z * z);
+  var midY = H / 2;
+  var scaleY = H / 2 - 15;
+  ctx.clearRect(0, 0, W, H);
+
+  // axes
+  ctx.strokeStyle = "#999";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, midY); ctx.lineTo(W, midY);
+  ctx.moveTo(0, 0); ctx.lineTo(0, H);
+  ctx.stroke();
+
+  // envelope (dashed)
+  ctx.strokeStyle = "#d93025";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  for (var x = 0; x <= W; x++) {
+    var t = (x / W) * T_MAX;
+    var e = Math.exp(-z * w0 * t);
+    if (x === 0) ctx.moveTo(x, midY - e * scaleY); else ctx.lineTo(x, midY - e * scaleY);
+  }
+  ctx.stroke();
+  ctx.beginPath();
+  for (var x2 = 0; x2 <= W; x2++) {
+    var t2 = (x2 / W) * T_MAX;
+    var e2 = Math.exp(-z * w0 * t2);
+    if (x2 === 0) ctx.moveTo(x2, midY + e2 * scaleY); else ctx.lineTo(x2, midY + e2 * scaleY);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // curve
+  ctx.strokeStyle = "#1a73e8";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (var x3 = 0; x3 <= W; x3++) {
+    var t3 = (x3 / W) * T_MAX;
+    var y = Math.exp(-z * w0 * t3) * Math.cos(wd * t3);
+    var py = midY - y * scaleY;
+    if (x3 === 0) ctx.moveTo(x3, py); else ctx.lineTo(x3, py);
+  }
+  ctx.stroke();
+
+  document.getElementById("zv").textContent = z.toFixed(2);
+  document.getElementById("wv").textContent = w0.toFixed(1);
+}
+
+Z.addEventListener("input", draw);
+Wn.addEventListener("input", draw);
+draw();
+</script>
+</body>
+</html>
