@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>加權最小範數 互動圖</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px;
+    background: #ffffff; color: #222222;
+    font-family: -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  canvas { width: 100%; height: auto; display: block; border: 1px solid #d0d0d0; border-radius: 6px; background: #fafafa; }
+  .controls { margin-top: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .row label { flex: 0 0 140px; font-size: 13px; }
+  .row input[type=range] { flex: 1 1 auto; min-width: 0; }
+  .row .val { flex: 0 0 48px; text-align: right; font-family: monospace; font-size: 13px; }
+  button {
+    padding: 6px 14px; font-size: 14px; border: 1px solid #4a6fd0; background: #4a6fd0;
+    color: #fff; border-radius: 6px; cursor: pointer; margin-top: 6px;
+  }
+  button:active { background: #3858b0; }
+  table { border-collapse: collapse; margin-top: 12px; width: 100%; font-size: 13px; }
+  td { padding: 4px 8px; border-bottom: 1px solid #e4e4e4; }
+  td.num { text-align: right; font-family: monospace; }
+  .legend { margin-top: 10px; font-size: 13px; color: #444; }
+  .legend span { display: inline-block; margin-right: 12px; }
+  .note { margin-top: 10px; font-size: 13px; color: #444; }
+  .good { color: #1a7f37; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="cv" width="480" height="480"></canvas>
+
+  <div class="controls">
+    <div class="row"><label for="s1">感測器 1 的 variance</label><input type="range" id="s1" min="0.2" max="10" step="0.1" value="1"><span class="val" id="s1v"></span></div>
+    <div class="row"><label for="s2">感測器 2 的 variance</label><input type="range" id="s2" min="0.2" max="10" step="0.1" value="4"><span class="val" id="s2v"></span></div>
+    <div class="row"><label for="a">權重 k1(k2 = 1 - k1)</label><input type="range" id="a" min="-0.5" max="1.5" step="any" value="0.5"><span class="val" id="av"></span></div>
+    <button id="best">把點移到最佳位置</button>
+  </div>
+
+  <table>
+    <tr><td>目前的 K</td><td class="num" id="curK"></td></tr>
+    <tr><td>目前的 variance:k1² σ1² + k2² σ2²</td><td class="num" id="curV"></td></tr>
+    <tr><td>最佳的 K</td><td class="num" id="optK"></td></tr>
+    <tr><td>最小的 variance</td><td class="num" id="optV"></td></tr>
+    <tr><td>目前比最小多出</td><td class="num" id="gap"></td></tr>
+  </table>
+
+  <div class="legend">
+    <span style="color:#1a7f37">綠線:k1 + k2 = 1(無偏的限制 KC = I)</span>
+    <span style="color:#3a5fcf">藍橢圓:目前點的 variance</span>
+    <span style="color:#c0392b">紅虛線橢圓:最小的 variance</span>
+  </div>
+  <div class="note">
+    同一個橢圓上的點,variance 一樣大。橢圓越小,variance 越小。<br>
+    只能走在綠線上,所以最好的點,就是橢圓縮到剛好碰到綠線的那一點。<br>
+    當兩個 variance 一樣時,橢圓是圓,最佳點是 (0.5, 0.5)。<br>
+    最佳權重 k1 = σ2² / (σ1² + σ2²),最小 variance = (1/σ1² + 1/σ2²)<sup>-1</sup>。
+  </div>
+</div>
+
+<script>
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  var cv = el("cv"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  var kmin = -0.6, kmax = 1.6;
+
+  function X(k) { return (k - kmin) / (kmax - kmin) * W; }
+  function Y(k) { return H - (k - kmin) / (kmax - kmin) * H; }
+  function f2(v) { var s = v.toFixed(2); return s === "-0.00" ? "0.00" : s; }
+
+  function line(x0, y0, x1, y1, color, width) {
+    g.strokeStyle = color; g.lineWidth = width;
+    g.beginPath(); g.moveTo(X(x0), Y(y0)); g.lineTo(X(x1), Y(y1)); g.stroke();
+  }
+
+  function ellipse(c, s1, s2, color, width, dash) {
+    var rx = Math.sqrt(c / s1), ry = Math.sqrt(c / s2);
+    g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash);
+    g.beginPath();
+    for (var i = 0; i <= 240; i++) {
+      var t = 2 * Math.PI * i / 240;
+      var x = X(rx * Math.cos(t)), y = Y(ry * Math.sin(t));
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  function dot(k1, k2, r, color) {
+    g.fillStyle = color;
+    g.beginPath(); g.arc(X(k1), Y(k2), r, 0, 2 * Math.PI); g.fill();
+    g.strokeStyle = "#fff"; g.lineWidth = 1.5; g.stroke();
+  }
+
+  function render() {
+    var s1 = parseFloat(el("s1").value);
+    var s2 = parseFloat(el("s2").value);
+    var a = parseFloat(el("a").value);
+    var b = 1 - a;
+    var cur = a * a * s1 + b * b * s2;
+    var aopt = s2 / (s1 + s2), bopt = 1 - aopt;
+    var copt = s1 * s2 / (s1 + s2);
+
+    el("s1v").textContent = s1.toFixed(1);
+    el("s2v").textContent = s2.toFixed(1);
+    el("av").textContent = f2(a);
+
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "#fafafa"; g.fillRect(0, 0, W, H);
+
+    // 格線
+    [-0.5, 0.5, 1, 1.5].forEach(function (k) {
+      line(k, kmin, k, kmax, "#ececec", 1);
+      line(kmin, k, kmax, k, "#ececec", 1);
+    });
+    // 軸
+    line(kmin, 0, kmax, 0, "#888", 1.5);
+    line(0, kmin, 0, kmax, "#888", 1.5);
+    g.fillStyle = "#666"; g.font = "13px sans-serif";
+    g.fillText("k1", W - 24, Y(0) - 6);
+    g.fillText("k2", X(0) + 6, 16);
+    g.fillText("1", X(1) - 4, Y(0) + 16);
+    g.fillText("1", X(0) + 6, Y(1) + 4);
+
+    // 限制線 k1 + k2 = 1
+    line(kmin, 1 - kmin, kmax, 1 - kmax, "#1a7f37", 2.5);
+
+    // 橢圓
+    ellipse(copt, s1, s2, "#c0392b", 2, [6, 5]);
+    ellipse(cur, s1, s2, "#3a5fcf", 2, []);
+
+    // 點
+    dot(aopt, bopt, 7, "#c0392b");
+    dot(a, b, 6, "#3a5fcf");
+    g.fillStyle = "#c0392b";
+    g.fillText("最佳", X(aopt) + 10, Y(bopt) - 8);
+
+    el("curK").textContent = "[" + f2(a) + ", " + f2(b) + "]";
+    el("curV").textContent = f2(cur);
+    el("optK").textContent = "[" + f2(aopt) + ", " + f2(bopt) + "]";
+    el("optV").textContent = f2(copt);
+    var d = cur - copt;
+    el("gap").innerHTML = d < 0.005 ? '<span class="good">0.00</span>' : f2(d);
+  }
+
+  ["s1", "s2", "a"].forEach(function (id) {
+    el(id).addEventListener("input", render);
+  });
+  el("best").addEventListener("click", function () {
+    var s1 = parseFloat(el("s1").value), s2 = parseFloat(el("s2").value);
+    el("a").value = s2 / (s1 + s2);
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
