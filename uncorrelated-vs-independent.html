@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uncorrelated vs independent</title>
+<style>
+  body{margin:0;padding:6px;font-family:system-ui,"Noto Sans TC",sans-serif;background:#fff;color:#222}
+  .row{display:flex;gap:8px}
+  .cell{flex:1;min-width:0}
+  .cap{font-size:14px;font-weight:600;text-align:center;margin:2px 0}
+  canvas{width:100%;height:auto;display:block}
+  .ctl{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:6px}
+  .ctl label{width:44px}
+  .ctl input{flex:1}
+  .ctl span{width:110px;text-align:right}
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="cell"><div class="cap">散佈圖</div><canvas id="a" width="400" height="400"></canvas></div>
+  <div class="cell"><div class="cap">y 的分佈</div><canvas id="b" width="400" height="400"></canvas></div>
+</div>
+<div class="ctl"><label>情況</label><input id="c" type="range" min="1" max="3" step="1" value="1"><span id="cv"></span></div>
+<div class="ctl"><label>x₀</label><input id="x" type="range" min="-0.95" max="0.95" step="0.01" value="0"><span id="xv"></span></div>
+<script>
+(function(){
+  let seed=12345;
+  function rnd(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;}
+  function gauss(){let u=rnd()||1e-9,v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  const N=4000, names=['','圓盤','正方形','斜橢圓'];
+  const sets={};
+  let p=[];while(p.length<N){const x=2*rnd()-1,y=2*rnd()-1;if(x*x+y*y<=1)p.push([x,y]);}sets[1]=p;
+  p=[];for(let i=0;i<N;i++)p.push([2*rnd()-1,2*rnd()-1]);sets[2]=p;
+  p=[];for(let i=0;i<N;i++){const z1=gauss(),z2=gauss();p.push([0.42*z1,0.42*(0.8*z1+0.6*z2)]);}sets[3]=p;
+
+  const R=1.2, a=document.getElementById('a'), b=document.getElementById('b');
+  const ca=a.getContext('2d'), cb=b.getContext('2d');
+  const W=400, M=30, S=(W-2*M)/(2*R);
+  const X=v=>M+(v+R)*S, Y=v=>W-M-(v+R)*S;
+  const hw=0.07, nb=24;
+
+  function axes(ctx,showX){
+    ctx.strokeStyle='#999';ctx.lineWidth=1;ctx.beginPath();
+    ctx.moveTo(M,Y(0));ctx.lineTo(W-M,Y(0));ctx.moveTo(showX?X(0):M,M);ctx.lineTo(showX?X(0):M,W-M);ctx.stroke();
+    ctx.fillStyle='#555';ctx.font='14px system-ui';
+    if(showX){ctx.fillText('x',W-M+6,Y(0)+5);ctx.fillText('y',X(0)-4,M-8);}
+    else{ctx.fillText('y',M-4,M-8);ctx.fillText('密度',W-M-20,Y(0)-6);}
+  }
+
+  function draw(){
+    const c=+document.getElementById('c').value, x0=+document.getElementById('x').value;
+    document.getElementById('cv').textContent=names[c];
+    document.getElementById('xv').textContent=x0.toFixed(2);
+    const pts=sets[c];
+    // left
+    ca.clearRect(0,0,W,W);
+    ca.fillStyle='rgba(255,170,60,0.18)';ca.fillRect(X(x0-hw),M,X(x0+hw)-X(x0-hw),W-2*M);
+    axes(ca,true);
+    for(const q of pts){const inb=Math.abs(q[0]-x0)<hw;ca.fillStyle=inb?'#d9822b':'rgba(47,111,181,0.35)';ca.fillRect(X(q[0])-1.2,Y(q[1])-1.2,2.4,2.4);}
+    let mx=0,my=0;for(const q of pts){mx+=q[0];my+=q[1];}mx/=pts.length;my/=pts.length;
+    let sxy=0,sxx=0;for(const q of pts){sxy+=(q[0]-mx)*(q[1]-my);sxx+=(q[0]-mx)**2;}
+    const k=sxy/sxx;
+    ca.strokeStyle='#c0392b';ca.lineWidth=2.5;ca.beginPath();ca.moveTo(X(-R),Y(my+k*(-R-mx)));ca.lineTo(X(R),Y(my+k*(R-mx)));ca.stroke();
+    // right: horizontal histograms of y
+    cb.clearRect(0,0,W,W);axes(cb,false);
+    const bw=2*R/nb;
+    function hist(arr){const h=new Array(nb).fill(0);for(const y of arr){const i=Math.floor((y+R)/bw);if(i>=0&&i<nb)h[i]++;}const n=arr.length||1;return h.map(v=>v/(n*bw));}
+    const all=hist(pts.map(q=>q[1])), band=hist(pts.filter(q=>Math.abs(q[0]-x0)<hw).map(q=>q[1]));
+    const dmax=3.2, L=(W-2*M)/dmax;
+    for(let i=0;i<nb;i++){const y1=-R+i*bw;const w=Math.min(band[i],dmax)*L;cb.fillStyle='rgba(217,130,43,0.75)';cb.fillRect(M,Y(y1+bw),w,Y(y1)-Y(y1+bw)-1);}
+    cb.strokeStyle='#2f6fb5';cb.lineWidth=2;cb.setLineDash([6,4]);cb.beginPath();
+    for(let i=0;i<nb;i++){const y1=-R+i*bw;const w=Math.min(all[i],dmax)*L;if(i===0)cb.moveTo(M,Y(y1));cb.lineTo(M+w,Y(y1));cb.lineTo(M+w,Y(y1+bw));}
+    cb.lineTo(M,Y(R));cb.stroke();cb.setLineDash([]);
+  }
+  document.getElementById('c').addEventListener('input',draw);
+  document.getElementById('x').addEventListener('input',draw);
+  draw();
+})();
+</script>
+</body>
+</html>
