@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bresenham 逐步畫線</title>
+<style>
+html, body { margin: 0; padding: 0; background: #ffffff; color: #1b2330; font-family: system-ui, "PingFang TC", "Microsoft JhengHei", sans-serif; }
+body { padding: 6px 8px; }
+.t { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+canvas { display: block; width: 100%; height: auto; }
+.row { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 14px; }
+.row input[type=range] { flex: 1; margin: 0; }
+.row .v { min-width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<p class="t">Bresenham 逐步畫線</p>
+<canvas id="cv"></canvas>
+<div class="row"><span>步驟</span><input id="s" type="range" min="1" max="13" step="1" value="1"><span class="v" id="v"></span></div>
+<script>
+(function () {
+  var COLS = 14, ROWS = 6, M = 24, H = 28, B = 22, CS = 41;
+  var W = M + COLS * CS, HT = H + ROWS * CS + B;
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var dpr = Math.max(2, window.devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = HT * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var C = { cell: '#fbfcfe', line: '#d6dce6', ink: '#1b2330', muted: '#5b6678', acc: '#1f5fd1', free: '#cdeedc', hit: '#d6452f', guide: '#b36a00' };
+  var FONT = 'system-ui, "PingFang TC", "Microsoft JhengHei", sans-serif';
+
+  var x0 = 0, y0 = 0, x1 = 12, y1 = 4;
+  var dx = x1 - x0, dy = y1 - y0, D = 2 * dy - dx, y = y0, steps = [], i;
+  for (i = 0; i <= dx; i++) {
+    var s = { m: x0 + i, n: y, last: i === dx, Db: D, up: false, t: y };
+    if (!s.last) {
+      s.t = y0 + dy * (s.m + 1 - x0) / dx;
+      if (D > 0) { s.up = true; y += 1; D -= 2 * dx; }
+      D += 2 * dy;
+    }
+    steps.push(s);
+  }
+
+  function gx(c) { return M + c * CS; }
+  function gy(r) { return H + (ROWS - 1 - r) * CS; }
+  function fx(c) { return M + (c + 0.5) * CS; }
+  function fy(r) { return H + (ROWS - 1 - r + 0.5) * CS; }
+
+  function draw(idx) {
+    var cur = steps[idx], k;
+    ctx.clearRect(0, 0, W, HT);
+    ctx.fillStyle = C.cell; ctx.fillRect(M, H, COLS * CS, ROWS * CS);
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (k = 0; k <= idx; k++) {
+      var t = steps[k], isHit = t.last && k === idx;
+      ctx.fillStyle = isHit ? C.hit : C.free;
+      ctx.fillRect(gx(t.m), gy(t.n), CS, CS);
+      ctx.fillStyle = isHit ? '#fff' : C.muted;
+      ctx.font = '11px ' + FONT;
+      ctx.fillText(String(k + 1), gx(t.m) + CS - 8, gy(t.n) + 9);
+    }
+
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath();
+    for (k = 0; k <= COLS; k++) { ctx.moveTo(gx(k) + 0.5, H); ctx.lineTo(gx(k) + 0.5, H + ROWS * CS); }
+    for (k = 0; k <= ROWS; k++) { ctx.moveTo(M, H + k * CS + 0.5); ctx.lineTo(M + COLS * CS, H + k * CS + 0.5); }
+    ctx.stroke();
+
+    ctx.fillStyle = C.muted; ctx.font = '11px ' + FONT;
+    for (k = 0; k < COLS; k++) ctx.fillText(String(k), fx(k), H + ROWS * CS + 11);
+    for (k = 0; k < ROWS; k++) ctx.fillText(String(k), M - 12, fy(k));
+    ctx.fillText('x', M + COLS * CS - 6, H + ROWS * CS + 11);
+    ctx.fillText('y', M - 12, H - 8);
+
+    ctx.fillStyle = C.acc; ctx.font = 'bold 12px ' + FONT;
+    ctx.fillText('S', gx(x0) + 8, gy(y0) + CS - 9);
+    ctx.fillText('E', gx(x1) + 8, gy(y1) + CS - 9);
+
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(fx(x0), fy(y0)); ctx.lineTo(fx(x1), fy(y1)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (!cur.last) {
+      var m2 = cur.m + 1;
+      ctx.strokeStyle = C.guide; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(fx(m2), fy(cur.n - 1.5)); ctx.lineTo(fx(m2), fy(cur.n + 1.5)); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(fx(m2 - 0.5), fy(cur.n + 0.5)); ctx.lineTo(fx(m2 + 0.5), fy(cur.n + 0.5)); ctx.stroke();
+      [[cur.n, false, '直走'], [cur.n + 1, true, '斜走']].forEach(function (c) {
+        var chosen = c[1] === cur.up;
+        ctx.setLineDash(chosen ? [] : [4, 3]);
+        ctx.lineWidth = chosen ? 2.5 : 1.5;
+        ctx.strokeStyle = chosen ? C.guide : C.muted;
+        ctx.strokeRect(gx(m2) + 3, gy(c[0]) + 3, CS - 6, CS - 6);
+        ctx.setLineDash([]);
+        ctx.fillStyle = chosen ? C.guide : C.muted;
+        ctx.font = (chosen ? 'bold ' : '') + '11px ' + FONT;
+        ctx.fillText(c[2], gx(m2) + CS / 2, gy(c[0]) + CS - 11);
+      });
+      ctx.fillStyle = C.guide;
+      ctx.beginPath(); ctx.arc(fx(m2), fy(cur.t), 4.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.strokeStyle = C.acc; ctx.lineWidth = 3;
+    ctx.strokeRect(gx(cur.m) + 1.5, gy(cur.n) + 1.5, CS - 3, CS - 3);
+
+    ctx.textAlign = 'left'; ctx.fillStyle = C.ink; ctx.font = 'bold 14px ' + FONT;
+    ctx.fillText(cur.last ? '終點' : 'D = ' + cur.Db, M, 14);
+    ctx.textAlign = 'center';
+  }
+
+  var sl = document.getElementById('s'), vl = document.getElementById('v');
+  function upd() { var n = parseInt(sl.value, 10); vl.textContent = n + ' / ' + steps.length; draw(n - 1); }
+  sl.addEventListener('input', upd);
+  upd();
+})();
+</script>
+</body>
+</html>
