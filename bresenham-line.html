@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="only light">
 <title>Bresenham 逐步畫線</title>
 <style>
+:root { color-scheme: only light; }
 html, body { margin: 0; padding: 0; background: #ffffff; color: #1b2330; font-family: system-ui, "PingFang TC", "Microsoft JhengHei", sans-serif; }
 body { padding: 6px 8px; }
 .t { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
@@ -48,7 +50,7 @@ canvas { display: block; width: 100%; height: auto; }
 
   function draw(idx) {
     var cur = steps[idx], k;
-    ctx.clearRect(0, 0, W, HT);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, HT);
     ctx.fillStyle = C.cell; ctx.fillRect(M, H, COLS * CS, ROWS * CS);
 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
